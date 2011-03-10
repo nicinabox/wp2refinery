@@ -16,19 +16,25 @@ file = File.read(opts[:file])
 xml = Crack::XML.parse(file)
 
 # Categories
-xml["rss"]["channel"]["wp:category"].each do |cat|
-#  p cat['wp:cat_name']  
+unless xml["rss"]["channel"]["wp:category"].nil?
+  xml["rss"]["channel"]["wp:category"].each do |cat|
+  #  p cat['wp:cat_name']  
+  end
 end
-
 
 # Posts
 xml["rss"]["channel"]["item"].each do |item|
-#  p item['title']
+  p item['title']
 
   # Comments
   unless item["wp:comment"].nil?
-    item["wp:comment"].each do |comment|
-      p comment
+    p item["wp:comment"].count
+    if item["wp:comment"].count > 1
+      item["wp:comment"].to_a.each do |comment|
+        p comment["wp:comment_content"]
+      end
+    else
+      p item["wp:comment"]["wp:comment_content"]
     end
   end
 end
