@@ -15,8 +15,8 @@ Jeweler::Tasks.new do |gem|
   gem.name = "wp2refinery"
   gem.homepage = "http://github.com/nicinabox/wp2refinery"
   gem.license = "MIT"
-  gem.summary = %Q{TODO: one-line summary of your gem}
-  gem.description = %Q{TODO: longer description of your gem}
+  gem.summary = %Q{TODO: Import Wordpress into Refinery}
+  gem.description = %Q{TODO: Import the default Wordpress posts into into Refinery CMS}
   gem.email = "nic@neotericdesign.com"
   gem.authors = ["Nic Haynes"]
   # Include your dependencies below. Runtime dependencies are required when using your gem,

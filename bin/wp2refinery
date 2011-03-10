@@ -1,1 +1,17 @@
 #!/usr/bin/env ruby
+require 'crack'
+require 'trollop'
+
+opts = Trollop::options do
+  opt :file, "File to import", :required => true, :type => String
+  opt :username, "MySQL database user", :type => String
+  opt :password, "MySQL database password", :type => String
+end
+
+# Read in the file
+xml = File.read(opts[:file])
+
+# Parse XML
+
+# Insert into Refinery blog db
+
