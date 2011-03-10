@@ -4,14 +4,34 @@ require 'trollop'
 
 opts = Trollop::options do
   opt :file, "File to import", :required => true, :type => String
+  opt :database, "MySQL database", :type => String
   opt :username, "MySQL database user", :type => String
   opt :password, "MySQL database password", :type => String
 end
 
 # Read in the file
-xml = File.read(opts[:file])
+file = File.read(opts[:file])
 
 # Parse XML
+xml = Crack::XML.parse(file)
+
+# Categories
+xml["rss"]["channel"]["wp:category"].each do |cat|
+#  p cat['wp:cat_name']  
+end
+
+
+# Posts
+xml["rss"]["channel"]["item"].each do |item|
+#  p item['title']
+
+  # Comments
+  unless item["wp:comment"].nil?
+    item["wp:comment"].each do |comment|
+      p comment
+    end
+  end
+end
 
 # Insert into Refinery blog db
 
