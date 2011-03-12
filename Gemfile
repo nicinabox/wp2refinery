@@ -12,5 +12,5 @@ group :development do
   gem "rcov", ">= 0"
 end
 
-gem 'crack'
+gem 'hpricot'
 gem 'trollop'

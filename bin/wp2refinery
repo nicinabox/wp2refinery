@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-require 'crack'
+require 'hpricot'
 require 'trollop'
 
 opts = Trollop::options do
@@ -9,34 +9,27 @@ opts = Trollop::options do
   opt :password, "MySQL database password", :type => String
 end
 
-# Read in the file
-file = File.read(opts[:file])
-
 # Parse XML
-xml = Crack::XML.parse(file)
+xml = Hpricot.XML(File.read(opts[:file]))
 
-# Categories
-unless xml["rss"]["channel"]["wp:category"].nil?
-  xml["rss"]["channel"]["wp:category"].each do |cat|
-  #  p cat['wp:cat_name']  
-  end
-end
-
-# Posts
-xml["rss"]["channel"]["item"].each do |item|
-  p item['title']
-
-  # Comments
-  unless item["wp:comment"].nil?
-    p item["wp:comment"].count
-    if item["wp:comment"].count > 1
-      item["wp:comment"].to_a.each do |comment|
-        p comment["wp:comment_content"]
+xml.search("//item").each do |item|
+  # Post
+  if item.search('wp:post_type').inner_html == "post"
+    #p item.search("title").inner_html
+    
+    item.search('wp:comment').each do |comment|
+      unless comment.search('wp:comment_approved').inner_html == "spam"
+        p comment.search('wp:comment_content').inner_html
       end
-    else
-      p item["wp:comment"]["wp:comment_content"]
     end
+    
+    
+  elsif item.search('wp:post_type').inner_html == "attachment"
+    # Attachments
   end
+  
+  
+  
 end
 
 # Insert into Refinery blog db
