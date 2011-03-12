@@ -32,6 +32,11 @@ xml.search("//item").each do |item|
     post[:wp_post_type] = item.search("wp:post_type").inner_html
     post[:wp_is_sticky] = item.search("wp:is_sticky").inner_html
     
+    # Meta
+    item.search("wp:postmeta").each_with_index do |meta, index|
+      post[:meta] ||= {}
+      post[:meta][meta.search("wp:meta_key").inner_html] = meta.search("wp:meta_value").inner_html
+    end
     
     # Categories
     item.search("category").each_with_index do |category, index|
