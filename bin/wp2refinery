@@ -9,21 +9,46 @@ opts = Trollop::options do
   opt :password, "MySQL database password", :type => String
 end
 
+post = {}
+
 # Parse XML
 xml = Hpricot.XML(File.read(opts[:file]))
-
 xml.search("//item").each do |item|
   # Post
   if item.search('wp:post_type').inner_html == "post"
-    #p item.search("title").inner_html
+    post[:title] = item.search("title").inner_html
+    post[:link] = item.search("link").inner_html
+    post[:published_at] = item.search("pubDate").inner_html
+    post[:creator] = item.search("dc:creator").inner_html
+    post[:content] = item.search("content:encoded").inner_html
+    post[:excerpt] = item.search("excerpt:encoded").inner_html
     
-    item.search('wp:comment').each do |comment|
-      unless comment.search('wp:comment_approved').inner_html == "spam"
-        p comment.search('wp:comment_content').inner_html
+    post[:wp_post_id] = item.search("wp:comment_status").inner_html
+    post[:wp_ping_status] = item.search("wp:ping_status").inner_html
+    post[:wp_post_name] = item.search("wp:post_name").inner_html
+    post[:wp_status] = item.search("wp:status").inner_html
+    post[:wp_post_parent] = item.search("wp:post_parent").inner_html
+    post[:wp_menu_order] = item.search("wp:menu_order").inner_html
+    post[:wp_post_type] = item.search("wp:post_type").inner_html
+    post[:wp_is_sticky] = item.search("wp:is_sticky").inner_html
+    
+    
+    # Categories
+    item.search("category").each_with_index do |category, index|
+      if (index%2 == 0) 
+        post[:categories] ||= {}
+        post[:categories] = category.inner_html
       end
     end
     
-    
+    # Comments
+    item.search('wp:comment').each_with_index do |comment, index|
+      unless comment.search('wp:comment_approved').inner_html == "spam"
+        post[:comments] ||= {}
+        post[:comments][index] = comment.search('wp:comment_content').inner_html
+      end
+    end
+
   elsif item.search('wp:post_type').inner_html == "attachment"
     # Attachments
   end
