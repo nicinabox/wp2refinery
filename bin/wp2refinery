@@ -50,10 +50,20 @@ xml.search("//item").each do |item|
     item.search('wp:comment').each_with_index do |comment, index|
       unless comment.search('wp:comment_approved').inner_html == "spam"
         post[:comments] ||= {}
-        post[:comments][index] = comment.search('wp:comment_content').inner_html
+        post[:comments][index] ||= {}
+        post[:comments][index][:comment_id] = comment.search('wp:comment_id').inner_html
+        post[:comments][index][:comment_author] = comment.search('wp:comment_author').inner_html
+        post[:comments][index][:comment_author_email] = comment.search('wp:comment_author_email').inner_html
+        post[:comments][index][:comment_author_url] = comment.search('wp:comment_author_url').inner_html
+        post[:comments][index][:comment_author_IP] = comment.search('wp:comment_author_IP').inner_html
+        post[:comments][index][:comment_content] = comment.search('wp:comment_content').inner_html
+        post[:comments][index][:comment_approved] = comment.search('wp:comment_approved').inner_html
+        post[:comments][index][:comment_type] = comment.search('wp:comment_type').inner_html
+        post[:comments][index][:comment_parent] = comment.search('wp:comment_parent').inner_html
+        post[:comments][index][:comment_user_id] = comment.search('wp:comment_user_id').inner_html
       end
     end
-
+p post[:comments]
   elsif item.search('wp:post_type').inner_html == "attachment"
     # Attachments
   end
