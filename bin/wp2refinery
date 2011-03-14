@@ -80,25 +80,27 @@ xml.search("//item").each do |item|
     end
     
     # Comments
+    post[:comments] = nil
     item.search('wp:comment').each_with_index do |comment, index|
       unless comment.search('wp:comment_approved').inner_html == "spam"
         post[:comments] ||= {}
         post[:comments][index] ||= {}
-        post[:comments][index][:comment_id] = comment.search('wp:comment_id').inner_html
-        post[:comments][index][:comment_author] = CGI.escapeHTML(comment.search('wp:comment_author').inner_text).gsub(/'/, "\\\\'")
-        post[:comments][index][:comment_author_email] = comment.search('wp:comment_author_email').inner_html
-        post[:comments][index][:comment_author_url] = comment.search('wp:comment_author_url').inner_html
-        post[:comments][index][:comment_author_IP] = comment.search('wp:comment_author_IP').inner_html
-        post[:comments][index][:comment_content] = comment.search('wp:comment_content').inner_text
-        post[:comments][index][:comment_approved] = comment.search('wp:comment_approved').inner_html
-        post[:comments][index][:comment_type] = comment.search('wp:comment_type').inner_html
-        post[:comments][index][:comment_parent] = comment.search('wp:comment_parent').inner_html
-        post[:comments][index][:comment_user_id] = comment.search('wp:comment_user_id').inner_html
+        post[:comments][index][:id] = comment.search('wp:comment_id').inner_html
+        post[:comments][index][:author] = CGI.escapeHTML(comment.search('wp:comment_author').inner_text).gsub(/'/, "\\\\'")
+        post[:comments][index][:author_email] = comment.search('wp:comment_author_email').inner_html
+        post[:comments][index][:author_url] = comment.search('wp:comment_author_url').inner_html
+        post[:comments][index][:author_IP] = comment.search('wp:comment_author_IP').inner_html
+        post[:comments][index][:comment_date] = Time.parse(comment.search('wp:comment_date').inner_html)
+        post[:comments][index][:content] = CGI.escapeHTML(comment.search('wp:comment_content').inner_text).gsub(/'/, "\\\\'")
+        post[:comments][index][:approved] = comment.search('wp:comment_approved').inner_html
+        post[:comments][index][:type] = comment.search('wp:comment_type').inner_html
+        post[:comments][index][:parent] = comment.search('wp:comment_parent').inner_html
+        post[:comments][index][:user_id] = comment.search('wp:comment_user_id').inner_html
       end
     end
 
   elsif item.search('wp:post_type').inner_html == "attachment"
-    # Attachments
+    # TODO: Attachments
   end
   
   # Hardcore database action
@@ -118,6 +120,19 @@ xml.search("//item").each do |item|
       post_id = db.last_id
       
       # Insert Comments
+      unless post[:comments] == nil
+        post[:comments].each do |comment|
+          comment = comment.last
+          if comment[:approved] == "1"
+            comment[:approved] = "approved"
+          else
+            # TODO: What are unapproved comments in refinery?
+            comment[:approved] = "pending"
+          end
+        
+          db.query("INSERT INTO blog_comments (blog_post_id, spam, name, email, body, state, created_at, updated_at) VALUES ('#{post_id}', '0' '#{comment[:author]}', '#{comment[:author_email]}', '#{comment[:content]}', '#{comment[:approved]}', '#{comment[:comment_date]}', '#{Time.now}')")
+        end
+      end
       
     end
   end
