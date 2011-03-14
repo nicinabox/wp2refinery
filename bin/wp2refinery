@@ -10,18 +10,25 @@ opts = Trollop::options do
 end
 
 post = {}
+categories = {}
 
 # Parse XML
 xml = Hpricot.XML(File.read(opts[:file]))
+
+# Categories 
+xml.search('//wp:category').each_with_index do |category, i|
+   categories[i] = category.search('wp:cat_name').inner_text
+end
+
+# Post
 xml.search("//item").each do |item|
-  # Post
   if item.search('wp:post_type').inner_html == "post"
     post[:title] = item.search("title").inner_html
     post[:link] = item.search("link").inner_html
     post[:published_at] = item.search("pubDate").inner_html
-    post[:creator] = item.search("dc:creator").inner_html
-    post[:content] = item.search("content:encoded").inner_html
-    post[:excerpt] = item.search("excerpt:encoded").inner_html
+    post[:creator] = item.search("dc:creator").inner_text
+    post[:content] = item.search("content:encoded").inner_text
+    post[:excerpt] = item.search("excerpt:encoded").inner_text
     
     post[:wp_post_id] = item.search("wp:comment_status").inner_html
     post[:wp_ping_status] = item.search("wp:ping_status").inner_html
@@ -42,7 +49,7 @@ xml.search("//item").each do |item|
     item.search("category").each_with_index do |category, index|
       if (index%2 == 0) 
         post[:categories] ||= {}
-        post[:categories] = category.inner_html
+        post[:categories] = category.inner_text
       end
     end
     
@@ -56,21 +63,19 @@ xml.search("//item").each do |item|
         post[:comments][index][:comment_author_email] = comment.search('wp:comment_author_email').inner_html
         post[:comments][index][:comment_author_url] = comment.search('wp:comment_author_url').inner_html
         post[:comments][index][:comment_author_IP] = comment.search('wp:comment_author_IP').inner_html
-        post[:comments][index][:comment_content] = comment.search('wp:comment_content').inner_html
+        post[:comments][index][:comment_content] = comment.search('wp:comment_content').inner_text
         post[:comments][index][:comment_approved] = comment.search('wp:comment_approved').inner_html
         post[:comments][index][:comment_type] = comment.search('wp:comment_type').inner_html
         post[:comments][index][:comment_parent] = comment.search('wp:comment_parent').inner_html
         post[:comments][index][:comment_user_id] = comment.search('wp:comment_user_id').inner_html
       end
     end
-p post[:comments]
+
   elsif item.search('wp:post_type').inner_html == "attachment"
     # Attachments
   end
-  
-  
+  # Insert into Refinery blog db
   
 end
 
-# Insert into Refinery blog db
 
