@@ -14,3 +14,4 @@ end
 
 gem 'hpricot'
 gem 'trollop'
+gem 'mysql2'

@@ -1,12 +1,17 @@
 #!/usr/bin/env ruby
 require 'hpricot'
 require 'trollop'
+require 'mysql2'
 
 opts = Trollop::options do
   opt :file, "File to import", :required => true, :type => String
   opt :database, "MySQL database", :type => String
   opt :username, "MySQL database user", :type => String
   opt :password, "MySQL database password", :type => String
+end
+
+if opts[:database] && opts[:username]
+  db = Mysql2::Client.new(:host => "localhost", :database => "#{opts[:database]}", :username => "#{opts[:username]}", :password => "#{opts[:password]}")
 end
 
 post = {}
@@ -18,6 +23,12 @@ xml = Hpricot.XML(File.read(opts[:file]))
 # Categories 
 xml.search('//wp:category').each_with_index do |category, i|
    categories[i] = category.search('wp:cat_name').inner_text
+   
+   # Save categories
+   if db
+     db.query("INSERT INTO blog_categories (title, created_at, updated_at) VALUES ('#{categories[i]}', '#{Time.now}', '#{Time.now}')")
+   end
+   
 end
 
 # Post
@@ -74,7 +85,10 @@ xml.search("//item").each do |item|
   elsif item.search('wp:post_type').inner_html == "attachment"
     # Attachments
   end
+  
+  
   # Insert into Refinery blog db
+  
   
 end
 
