@@ -2,6 +2,8 @@
 require 'hpricot'
 require 'trollop'
 require 'mysql2'
+require 'cgi'
+require 'time'
 
 opts = Trollop::options do
   opt :file, "File to import", :required => true, :type => String
@@ -15,31 +17,44 @@ if opts[:database] && opts[:username]
 end
 
 post = {}
-categories = {}
+categories = []
+users = []
 
 # Parse XML
 xml = Hpricot.XML(File.read(opts[:file]))
 
 # Categories 
-xml.search('//wp:category').each_with_index do |category, i|
-   categories[i] = category.search('wp:cat_name').inner_text
-   
-   # Save categories
-   if db
-     db.query("INSERT INTO blog_categories (title, created_at, updated_at) VALUES ('#{categories[i]}', '#{Time.now}', '#{Time.now}')")
-   end
-   
+xml.search('//wp:category').each do |category|
+  categories << category.search('wp:cat_name').inner_text
+
+  # Save categories
+  if db
+   db.query("INSERT INTO blog_categories (title, created_at, updated_at) VALUES ('#{categories.last}', '#{Time.now}', '#{Time.now}')")
+  end
+end
+
+# Users
+xml.search('//dc:creator').each do |user|
+  unless users.include?(user.inner_text)
+    users << user.inner_text
+
+    # Save users
+    if db
+      db.query("INSERT INTO users (username, created_at, updated_at) VALUES ('#{users.last}', '#{Time.now}', '#{Time.now}')")
+    end
+  end
 end
 
 # Post
 xml.search("//item").each do |item|
   if item.search('wp:post_type').inner_html == "post"
+    post[:post_id] = item.search("post_id").inner_html
     post[:title] = item.search("title").inner_html
     post[:link] = item.search("link").inner_html
-    post[:published_at] = item.search("pubDate").inner_html
-    post[:creator] = item.search("dc:creator").inner_text
-    post[:content] = item.search("content:encoded").inner_text
-    post[:excerpt] = item.search("excerpt:encoded").inner_text
+    post[:published_at] = Time.parse(item.search("pubDate").inner_html)
+    post[:creator] = CGI.escapeHTML(item.search("dc:creator").inner_text).gsub(/'/, "\\\\'")
+    post[:content] = CGI.escapeHTML(item.search("content:encoded").inner_text).gsub(/'/, "\\\\'")
+    post[:excerpt] = CGI.escapeHTML(item.search("excerpt:encoded").inner_text).gsub(/'/, "\\\\'")
     
     post[:wp_post_id] = item.search("wp:comment_status").inner_html
     post[:wp_ping_status] = item.search("wp:ping_status").inner_html
@@ -70,7 +85,7 @@ xml.search("//item").each do |item|
         post[:comments] ||= {}
         post[:comments][index] ||= {}
         post[:comments][index][:comment_id] = comment.search('wp:comment_id').inner_html
-        post[:comments][index][:comment_author] = comment.search('wp:comment_author').inner_html
+        post[:comments][index][:comment_author] = CGI.escapeHTML(comment.search('wp:comment_author').inner_text).gsub(/'/, "\\\\'")
         post[:comments][index][:comment_author_email] = comment.search('wp:comment_author_email').inner_html
         post[:comments][index][:comment_author_url] = comment.search('wp:comment_author_url').inner_html
         post[:comments][index][:comment_author_IP] = comment.search('wp:comment_author_IP').inner_html
@@ -86,10 +101,24 @@ xml.search("//item").each do |item|
     # Attachments
   end
   
-  
-  # Insert into Refinery blog db
-  
-  
+  # Hardcore database action
+  if db    
+    unless post[:wp_status] == "auto-draft"    
+      # Get inserted user id
+      user_id = db.query("SELECT id FROM users WHERE username = '#{post[:creator]}'")
+    
+      # Convert draft status
+      draft = 0
+      if post[:wp_status] == "draft"
+        draft == 1
+      end
+      
+      # Insert post
+      db.query("INSERT INTO blog_posts (title, body, draft, published_at, created_at, updated_at, user_id) VALUES ('#{post[:title]}', '#{post[:content]}', '#{draft}', '#{post[:published_at]}', '#{post[:published_at]}', '#{Time.now}', '#{user_id.first["id"]}')")
+      post_id = db.last_id
+      
+      # Insert Comments
+      
+    end
+  end
 end
-
-
