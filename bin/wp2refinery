@@ -119,6 +119,13 @@ xml.search("//item").each do |item|
           post[:published_at] = post[:created_at]
         end
         
+        # See if we have embeded video
+        unless (post[:content].match(/http:\/\/www\.youtube\.com\/watch\?v=([a-z0-9]+).*/i)).nil?
+          post[:content] = %{
+            <iframe title="YouTube video player" width="480" height="390" src="#{post[:content]}" frameborder="0" allowfullscreen></iframe>
+          }
+        end
+        
         # Insert post
         db.query("INSERT INTO blog_posts (title, body, draft, published_at, created_at, updated_at, user_id) VALUES ('#{post[:title]}', '#{post[:content]}', '#{draft}', '#{post[:published_at]}', '#{post[:created_at]}', '#{Time.now}', '#{user_id.first["id"]}')")
         post_id = db.last_id
