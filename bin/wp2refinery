@@ -126,6 +126,9 @@ xml.search("//item").each do |item|
           }
         end
         
+        # Convert line breaks to paragraphs
+        post[:content].gsub!(/^(.*)$/, '<p>\1</p>')
+        
         # Insert post
         db.query("INSERT INTO blog_posts (title, body, draft, published_at, created_at, updated_at, user_id) VALUES ('#{post[:title]}', '#{post[:content]}', '#{draft}', '#{post[:published_at]}', '#{post[:created_at]}', '#{Time.now}', '#{user_id.first["id"]}')")
         post_id = db.last_id
