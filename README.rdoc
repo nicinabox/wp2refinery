@@ -1,6 +1,19 @@
 = wp2refinery
 
-Description goes here.
+Convert your Wordpress blog database to the Refinery Blog Engine. It will bring bring over users, posts, comments, categories, and tags. It's not always a perfect match, but it will try to insert as much information as possible.
+
+== Parameters
+
+For commandline help use
+  $ wp2refinery --help
+
+-f : the xml file you want to import (this would be the export from wordpress)
+-d : mysql database
+-u : mysql username
+-p : mysql password
+
+Sample Use:
+  $ wp2refinery -f wordpress.export.xml -d blog_development -u root -p mypass
 
 == Contributing to wp2refinery
  
