@@ -95,7 +95,7 @@ xml.search("//item").each do |item|
         post[:comments][index][:author_url] = comment.search('wp:comment_author_url').inner_html
         post[:comments][index][:author_IP] = comment.search('wp:comment_author_IP').inner_html
         post[:comments][index][:comment_date] = Time.parse(comment.search('wp:comment_date').inner_html)
-        post[:comments][index][:content] = comment.search('wp:comment_content').inner_text.gsub(/'/, "\\\\'")
+        post[:comments][index][:content] = CGI.unescapeHTML(comment.search('wp:comment_content').inner_text).gsub(/'/, "\\\\'")
         post[:comments][index][:approved] = comment.search('wp:comment_approved').inner_html
         post[:comments][index][:type] = comment.search('wp:comment_type').inner_html
         post[:comments][index][:parent] = comment.search('wp:comment_parent').inner_html
