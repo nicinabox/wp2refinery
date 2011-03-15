@@ -47,14 +47,17 @@ end
 
 # Post
 xml.search("//item").each do |item|
+  post = {}
   if item.search('wp:post_type').inner_html == "post"
     post[:post_id] = item.search("post_id").inner_html
     post[:title] = item.search("title").inner_html
     post[:link] = item.search("link").inner_html
     post[:published_at] = Time.parse(item.search("pubDate").inner_html)
-    post[:creator] = CGI.escapeHTML(item.search("dc:creator").inner_text).gsub(/'/, "\\\\'")
-    post[:content] = CGI.escapeHTML(item.search("content:encoded").inner_text).gsub(/'/, "\\\\'")
-    post[:excerpt] = CGI.escapeHTML(item.search("excerpt:encoded").inner_text).gsub(/'/, "\\\\'")
+    post[:created_at] = Time.parse(item.search("wp:post_date").inner_html)
+    post[:post_date_gmt] = item.search("wp:post_date_gmt").inner_html
+    post[:creator] = item.search("dc:creator").inner_text.gsub(/'/, "\\\\'")
+    post[:content] = item.search("content:encoded").inner_text.gsub(/'/, "\\\\'")
+    post[:excerpt] = item.search("excerpt:encoded").inner_text.gsub(/'/, "\\\\'")
     
     post[:wp_post_id] = item.search("wp:comment_status").inner_html
     post[:wp_ping_status] = item.search("wp:ping_status").inner_html
@@ -80,7 +83,6 @@ xml.search("//item").each do |item|
       end
     end
     
-    p post[:categories]
     # Comments
     post[:comments] = nil
     item.search('wp:comment').each_with_index do |comment, index|
@@ -93,51 +95,61 @@ xml.search("//item").each do |item|
         post[:comments][index][:author_url] = comment.search('wp:comment_author_url').inner_html
         post[:comments][index][:author_IP] = comment.search('wp:comment_author_IP').inner_html
         post[:comments][index][:comment_date] = Time.parse(comment.search('wp:comment_date').inner_html)
-        post[:comments][index][:content] = CGI.escapeHTML(comment.search('wp:comment_content').inner_text).gsub(/'/, "\\\\'")
+        post[:comments][index][:content] = comment.search('wp:comment_content').inner_text.gsub(/'/, "\\\\'")
         post[:comments][index][:approved] = comment.search('wp:comment_approved').inner_html
         post[:comments][index][:type] = comment.search('wp:comment_type').inner_html
         post[:comments][index][:parent] = comment.search('wp:comment_parent').inner_html
         post[:comments][index][:user_id] = comment.search('wp:comment_user_id').inner_html
       end
     end
-
-  elsif item.search('wp:post_type').inner_html == "attachment"
-    # TODO: Attachments
-  end
-  
-  # Hardcore database action
-  if db    
-    unless post[:wp_status] == "auto-draft"    
-      # Get inserted user id
-      user_id = db.query("SELECT id FROM users WHERE username = '#{post[:creator]}'")
     
-      # Convert draft status
-      draft = 0
-      if post[:wp_status] == "draft"
-        draft == 1
-      end
-      
-      # Insert post
-      db.query("INSERT INTO blog_posts (title, body, draft, published_at, created_at, updated_at, user_id) VALUES ('#{post[:title]}', '#{post[:content]}', '#{draft}', '#{post[:published_at]}', '#{post[:published_at]}', '#{Time.now}', '#{user_id.first["id"]}')")
-      post_id = db.last_id
-      
-      # Insert Comments
-      unless post[:comments] == nil
-        post[:comments].each do |comment|
-          comment = comment.last
-          if comment[:approved] == "1"
-            comment[:approved] = "approved"
-          else
-            comment[:approved] = nil
-          end
+    # Hardcore database action
+    if db    
+      unless post[:wp_status] == "auto-draft"    
+        # Get inserted user id
+        user_id = db.query("SELECT id FROM users WHERE username = '#{post[:creator]}'")
+
+        # Convert draft status
+        draft = 0
+        if post[:wp_status] == "draft"
+          draft = 1
+        end
         
-          db.query("INSERT INTO blog_comments (blog_post_id, spam, name, email, body, state, created_at, updated_at) VALUES ('#{post_id}', '0' '#{comment[:author]}', '#{comment[:author_email]}', '#{comment[:content]}', '#{comment[:approved]}', '#{comment[:comment_date]}', '#{Time.now}')")
+        if post[:post_date_gmt] == "0000-00-00 00:00:00"
+          post[:published_at] = post[:created_at]
+        end
+        
+        # Insert post
+        db.query("INSERT INTO blog_posts (title, body, draft, published_at, created_at, updated_at, user_id) VALUES ('#{post[:title]}', '#{post[:content]}', '#{draft}', '#{post[:published_at]}', '#{post[:created_at]}', '#{Time.now}', '#{user_id.first["id"]}')")
+        post_id = db.last_id
+
+        # Insert Comments
+        unless post[:comments] == nil
+          post[:comments].each do |comment|
+            comment = comment.last
+            if comment[:approved] == "1"
+              comment[:approved] = "approved"
+            else
+              comment[:approved] = nil
+            end
+
+            db.query("INSERT INTO blog_comments (blog_post_id, spam, name, email, body, state, created_at, updated_at) VALUES ('#{post_id}', '0', '#{comment[:author]}', '#{comment[:author_email]}', '#{comment[:content]}', '#{comment[:approved]}', '#{comment[:comment_date]}', '#{Time.now}')")
+          end
+        end
+
+        # Associate categories
+        post[:categories].each do |cat|
+          blog_category_id = db.query("SELECT id FROM blog_categories WHERE title = '#{cat}'")
+          blog_category_id = blog_category_id.first["id"]
+
+          db.query("INSERT INTO blog_categories_blog_posts (blog_category_id, blog_post_id) VALUES ('#{blog_category_id}', '#{post_id}')")
         end
       end
-      
+      p "#{post[:title]}"
     end
-  end
   
-  # Associate categories
+  elsif item.search('wp:post_type').inner_html == "attachment"
+    # TODO: Attachments
+  end  
   
 end
