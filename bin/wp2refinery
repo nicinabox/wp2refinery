@@ -25,7 +25,7 @@ xml = Hpricot.XML(File.read(opts[:file]))
 
 # Categories 
 xml.search('//wp:category').each do |category|
-  categories << category.search('wp:cat_name').inner_text
+  categories << CGI.unescapeHTML(category.search('wp:cat_name').inner_text).gsub(/'/, "\\\\'")
 
   # Save categories
   if db
@@ -50,7 +50,7 @@ xml.search("//item").each do |item|
   post = {}
   if item.search('wp:post_type').inner_html == "post"
     post[:post_id] = item.search("post_id").inner_html
-    post[:title] = item.search("title").inner_html
+    post[:title] = CGI.unescapeHTML(item.search("title").inner_html).gsub(/'/, "\\\\'")
     post[:link] = item.search("link").inner_html
     post[:published_at] = Time.parse(item.search("pubDate").inner_html)
     post[:created_at] = Time.parse(item.search("wp:post_date").inner_html)
@@ -79,7 +79,7 @@ xml.search("//item").each do |item|
     post[:categories] ||= []
     item.search("category").each_with_index do |category, index|
       unless post[:categories].include?(category.inner_text)
-        post[:categories] << category.inner_text
+        post[:categories] << CGI.unescapeHTML(category.inner_text).gsub(/'/, "\\\\'")
       end
     end
     
@@ -140,7 +140,7 @@ xml.search("//item").each do |item|
         # Associate categories
         post[:categories].each do |cat|
           blog_category_id = db.query("SELECT id FROM blog_categories WHERE title = '#{cat}'")
-          blog_category_id = blog_category_id.first["id"]
+          blog_category_id = blog_category_id.first["id"] || nil
 
           db.query("INSERT INTO blog_categories_blog_posts (blog_category_id, blog_post_id) VALUES ('#{blog_category_id}', '#{post_id}')")
         end
