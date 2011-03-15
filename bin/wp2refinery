@@ -72,13 +72,15 @@ xml.search("//item").each do |item|
     end
     
     # Categories
+    post[:categories] = nil
+    post[:categories] ||= []
     item.search("category").each_with_index do |category, index|
-      if (index%2 == 0) 
-        post[:categories] ||= {}
-        post[:categories] = category.inner_text
+      unless post[:categories].include?(category.inner_text)
+        post[:categories] << category.inner_text
       end
     end
     
+    p post[:categories]
     # Comments
     post[:comments] = nil
     item.search('wp:comment').each_with_index do |comment, index|
@@ -126,8 +128,7 @@ xml.search("//item").each do |item|
           if comment[:approved] == "1"
             comment[:approved] = "approved"
           else
-            # TODO: What are unapproved comments in refinery?
-            comment[:approved] = "pending"
+            comment[:approved] = nil
           end
         
           db.query("INSERT INTO blog_comments (blog_post_id, spam, name, email, body, state, created_at, updated_at) VALUES ('#{post_id}', '0' '#{comment[:author]}', '#{comment[:author_email]}', '#{comment[:content]}', '#{comment[:approved]}', '#{comment[:comment_date]}', '#{Time.now}')")
@@ -136,4 +137,7 @@ xml.search("//item").each do |item|
       
     end
   end
+  
+  # Associate categories
+  
 end
