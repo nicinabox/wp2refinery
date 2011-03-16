@@ -56,7 +56,7 @@ xml.search("//item").each do |item|
     post[:created_at] = Time.parse(item.search("wp:post_date").inner_html)
     post[:post_date_gmt] = item.search("wp:post_date_gmt").inner_html
     post[:creator] = item.search("dc:creator").inner_text.gsub(/'/, "\\\\'")
-    post[:content] = item.search("content:encoded").inner_text.gsub(/'/, "\\\\'")
+    post[:content] = item.search("content:encoded").inner_text.gsub(/'/, "\\\\'").gsub(/\r\n\r\n/, '<p>\1</p>')
     post[:excerpt] = item.search("excerpt:encoded").inner_text.gsub(/'/, "\\\\'")
     
     post[:wp_post_id] = item.search("wp:comment_status").inner_html
@@ -102,7 +102,7 @@ xml.search("//item").each do |item|
         post[:comments][index][:user_id] = comment.search('wp:comment_user_id').inner_html
       end
     end
-    
+
     # Hardcore database action
     if db    
       unless post[:wp_status] == "auto-draft"    
@@ -125,9 +125,6 @@ xml.search("//item").each do |item|
             <iframe title="YouTube video player" width="480" height="390" src="#{post[:content]}" frameborder="0" allowfullscreen></iframe>
           }
         end
-        
-        # Convert line breaks to paragraphs
-        post[:content].gsub!(/^(.*)$/, '<p>\1</p>')
         
         # Insert post
         db.query("INSERT INTO blog_posts (title, body, draft, published_at, created_at, updated_at, user_id) VALUES ('#{post[:title]}', '#{post[:content]}', '#{draft}', '#{post[:published_at]}', '#{post[:created_at]}', '#{Time.now}', '#{user_id.first["id"]}')")
