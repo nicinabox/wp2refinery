@@ -56,7 +56,7 @@ xml.search("//item").each do |item|
     post[:created_at] = Time.parse(item.search("wp:post_date").inner_html)
     post[:post_date_gmt] = item.search("wp:post_date_gmt").inner_html
     post[:creator] = item.search("dc:creator").inner_text.gsub(/'/, "\\\\'")
-    post[:content] = item.search("content:encoded").inner_text.gsub(/'/, "\\\\'").gsub(/\r\n\r\n/, '<p>\1</p>')
+    post[:content] = item.search("content:encoded").inner_text.gsub(/'/, "\\\\'")
     post[:excerpt] = item.search("excerpt:encoded").inner_text.gsub(/'/, "\\\\'")
     
     post[:wp_post_id] = item.search("wp:comment_status").inner_html
@@ -102,7 +102,11 @@ xml.search("//item").each do |item|
         post[:comments][index][:user_id] = comment.search('wp:comment_user_id').inner_html
       end
     end
-
+    
+    post[:content] = "<p>#{post[:content]}</p>"
+    post[:content].gsub!(/(\r\n\r\n)/, "</p><p>")
+#    p post[:content]
+    
     # Hardcore database action
     if db    
       unless post[:wp_status] == "auto-draft"    
