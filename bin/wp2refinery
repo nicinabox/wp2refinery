@@ -103,9 +103,18 @@ xml.search("//item").each do |item|
       end
     end
     
+    # Convert to paragraphs
     post[:content] = "<p>#{post[:content]}</p>"
     post[:content].gsub!(/(\r\n\r\n)/, "</p><p>")
-#    p post[:content]
+    
+    # Strip inline styles
+    content = Hpricot(post[:content])
+    content.search("[@style]").each do |e| 
+      unless e.empty?
+        e.remove_attribute("style")
+      end
+    end
+    post[:content] = content.inner_html
     
     # Hardcore database action
     if db    
