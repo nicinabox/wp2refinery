@@ -2,18 +2,24 @@
 require 'hpricot'
 require 'trollop'
 require 'mysql2'
+require 'sqlite3'
 require 'cgi'
 require 'time'
+require 'yaml'
+require 'active_record'
+
 
 opts = Trollop::options do
   opt :file, "File to import", :required => true, :type => String
-  opt :database, "MySQL database", :type => String
-  opt :username, "MySQL database user", :type => String
-  opt :password, "MySQL database password", :type => String
+  opt :tags, "File with tags. Existing categories with the same name will be converted", :type => String
+  opt :dryrun, "Dry run. Don't import into database"
 end
 
-if opts[:database] && opts[:username]
-  db = Mysql2::Client.new(:host => "localhost", :database => "#{opts[:database]}", :username => "#{opts[:username]}", :password => "#{opts[:password]}")
+
+# Read the database.yml file
+unless opts[:dryrun]
+  db = File.exists?('config/database.yml') ? YAML::load_file('config/database.yml') : nil
+  ar = ActiveRecord::Base.establish_connection(db["development"]) if db
 end
 
 post = {}
@@ -23,13 +29,29 @@ users = []
 # Parse XML
 xml = Hpricot.XML(File.read(opts[:file]))
 
+# Tags
+tags = []
+unless opts[:tags].nil?
+  file_tags = File.new(opts[:tags], 'r')
+  file_tags.each do |tag|
+    tags << (tag = tag.strip.capitalize)
+  
+    # if db
+    #   db.query("INSERT IGNORE INTO tags (name) VALUES ('#{tag}')")
+    # end
+  end
+end
+
 # Categories 
 xml.search('//wp:category').each do |category|
-  categories << CGI.unescapeHTML(category.search('wp:cat_name').inner_text).gsub(/'/, "\\\\'")
-
+  category = CGI.unescapeHTML(category.search('wp:cat_name').inner_text).gsub(/'/, "\\\\'")
+  unless tags.include?(category.capitalize) || categories.include?(category)
+    categories << category
+  end
+  
   # Save categories
-  if db
-   db.query("INSERT INTO blog_categories (title, created_at, updated_at) VALUES ('#{categories.last}', '#{Time.now}', '#{Time.now}')")
+  if db && category
+    blog_category = BlogCategory.create(:title => category)
   end
 end
 
@@ -40,7 +62,7 @@ xml.search('//dc:creator').each do |user|
 
     # Save users
     if db
-      db.query("INSERT INTO users (username, created_at, updated_at) VALUES ('#{users.last}', '#{Time.now}', '#{Time.now}')")
+      user = User.create(:username => users.last)
     end
   end
 end
@@ -120,28 +142,28 @@ xml.search("//item").each do |item|
     if db    
       unless post[:wp_status] == "auto-draft"    
         # Get inserted user id
-        user_id = db.query("SELECT id FROM users WHERE username = '#{post[:creator]}'")
+        author = User.find(post[:creator])
 
         # Convert draft status
         draft = 0
-        if post[:wp_status] == "draft"
-          draft = 1
-        end
+        draft = 1 if post[:wp_status] == "draft"
         
         if post[:post_date_gmt] == "0000-00-00 00:00:00"
           post[:published_at] = post[:created_at]
         end
         
         # See if we have embeded video
-        unless (post[:content].match(/http:\/\/www\.youtube\.com\/watch\?v=([a-z0-9]+).*/i)).nil?
-          post[:content] = %{
-            <iframe title="YouTube video player" width="480" height="390" src="#{post[:content]}" frameborder="0" allowfullscreen></iframe>
-          }
-        end
+        post[:content].match(/v=([\w]+)/i) {|m| post[:content] = %{<iframe title="YouTube video player" width="480" height="390" src="http://www.youtube.com/embed/#{m}" frameborder="0" allowfullscreen></iframe>}}
         
         # Insert post
-        db.query("INSERT INTO blog_posts (title, body, draft, published_at, created_at, updated_at, user_id) VALUES ('#{post[:title]}', '#{post[:content]}', '#{draft}', '#{post[:published_at]}', '#{post[:created_at]}', '#{Time.now}', '#{user_id.first["id"]}')")
-        post_id = db.last_id
+        post = BlogPost.new(
+          :title => post[:title],
+          :body => post[:content],
+          :draft => draft,
+          :published_at => post[:published_at], 
+          :created_at => post[:created_at], 
+          :user_id => author.id  
+        )
 
         # Insert Comments
         unless post[:comments] == nil
@@ -152,19 +174,40 @@ xml.search("//item").each do |item|
             else
               comment[:approved] = nil
             end
-
-            db.query("INSERT INTO blog_comments (blog_post_id, spam, name, email, body, state, created_at, updated_at) VALUES ('#{post_id}', '0', '#{comment[:author]}', '#{comment[:author_email]}', '#{comment[:content]}', '#{comment[:approved]}', '#{comment[:comment_date]}', '#{Time.now}')")
+            
+            # TODO: Comments
+            comment = post.comments.new(
+              :blog_post_id => post.id,
+              :spam => 0,
+              :name => comment[:author],
+              :email => comment[:author_email],
+              :body => comment[:content], 
+              :state => comment[:approved]
+            )
           end
         end
-
-        # Associate categories
-        post[:categories].each do |cat|
-          blog_category_id = db.query("SELECT id FROM blog_categories WHERE title = '#{cat}'")
-          blog_category_id = blog_category_id.first["id"] || nil
-
-          db.query("INSERT INTO blog_categories_blog_posts (blog_category_id, blog_post_id) VALUES ('#{blog_category_id}', '#{post_id}')")
-        end
+        
+        p post.title
+        
+        # Associate categories & tags
+        # post[:categories].each do |cat|
+        #   blog_category_id = db.query("SELECT id FROM blog_categories WHERE title LIKE '#{cat}'")
+        #   blog_category_id = blog_category_id.first["id"] unless blog_category_id.nil?
+        #   if blog_category_id.nil? # It's probably a tag
+        #     tag_id = db.query("SELECT id FROM tags WHERE name LIKE '#{cat}'")
+        #     tag_id = tag_id.first["id"]
+        #     unless tag_id.nil?
+        #       db.query("INSERT INTO taggings (tag_id, taggable_id, taggable_type, context, created_at) VALUES ('#{tag_id}', '#{post_id}', 'BlogPost', 'tags', '#{Time.now}')")
+        #     end
+        #   else # It's a category!
+        #     db.query("INSERT INTO blog_categories_blog_posts (blog_category_id, blog_post_id) VALUES ('#{blog_category_id}', '#{post_id}')")
+        #   end
+        # end
+        
       end
+      
+      # TODO: Save everything to generate friendly ids (needs active_record)
+      
       p "#{post[:title]}"
     end
   
