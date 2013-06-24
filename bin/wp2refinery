@@ -1,16 +1,22 @@
 #!/usr/bin/env ruby
+# encoding: utf-8
+# encode: utf-8
 require 'hpricot'
 require 'trollop'
 require 'mysql2'
 require 'cgi'
 require 'time'
 
+
 opts = Trollop::options do
   opt :file, "File to import", :required => true, :type => String
   opt :database, "MySQL database", :type => String
   opt :username, "MySQL database user", :type => String
   opt :password, "MySQL database password", :type => String
+  opt :prefix, "Table Prefix", :type => String, :default => ''
 end
+
+table_prefix = opts[:prefix]
 
 if opts[:database] && opts[:username]
   db = Mysql2::Client.new(:host => "localhost", :database => "#{opts[:database]}", :username => "#{opts[:username]}", :password => "#{opts[:password]}")
@@ -21,7 +27,7 @@ categories = []
 users = []
 
 # Parse XML
-xml = Hpricot.XML(File.read(opts[:file]))
+xml = Hpricot.XML(File.read(opts[:file]).encode!('UTF-8'))
 
 # Categories 
 xml.search('//wp:category').each do |category|
@@ -29,7 +35,7 @@ xml.search('//wp:category').each do |category|
 
   # Save categories
   if db
-   db.query("INSERT INTO blog_categories (title, created_at, updated_at) VALUES ('#{categories.last}', '#{Time.now}', '#{Time.now}')")
+   db.query("INSERT INTO #{table_prefix}blog_categories (title, created_at, updated_at) VALUES ('#{categories.last}', '#{Time.now}', '#{Time.now}')")
   end
 end
 
@@ -40,7 +46,7 @@ xml.search('//dc:creator').each do |user|
 
     # Save users
     if db
-      db.query("INSERT INTO users (username, created_at, updated_at) VALUES ('#{users.last}', '#{Time.now}', '#{Time.now}')")
+      db.query("INSERT INTO #{table_prefix}users (username, created_at, updated_at) VALUES ('#{users.last}', '#{Time.now}', '#{Time.now}')")
     end
   end
 end
@@ -114,13 +120,13 @@ xml.search("//item").each do |item|
         e.remove_attribute("style")
       end
     end
-    post[:content] = content.inner_html
+    post[:content] = content.inner_html.encode('UTF-8')
     
     # Hardcore database action
     if db    
       unless post[:wp_status] == "auto-draft"    
         # Get inserted user id
-        user_id = db.query("SELECT id FROM users WHERE username = '#{post[:creator]}'")
+        user_id = db.query("SELECT id FROM #{table_prefix}users WHERE username = '#{post[:creator]}'")
 
         # Convert draft status
         draft = 0
@@ -140,7 +146,7 @@ xml.search("//item").each do |item|
         end
         
         # Insert post
-        db.query("INSERT INTO blog_posts (title, body, draft, published_at, created_at, updated_at, user_id) VALUES ('#{post[:title]}', '#{post[:content]}', '#{draft}', '#{post[:published_at]}', '#{post[:created_at]}', '#{Time.now}', '#{user_id.first["id"]}')")
+        db.query("INSERT INTO #{table_prefix}blog_posts (title, body, draft, published_at, created_at, updated_at, user_id) VALUES ('#{post[:title]}', '#{post[:content]}', '#{draft}', '#{post[:published_at]}', '#{post[:created_at]}', '#{Time.now}', '#{user_id.first["id"]}')")
         post_id = db.last_id
 
         # Insert Comments
@@ -153,16 +159,24 @@ xml.search("//item").each do |item|
               comment[:approved] = nil
             end
 
-            db.query("INSERT INTO blog_comments (blog_post_id, spam, name, email, body, state, created_at, updated_at) VALUES ('#{post_id}', '0', '#{comment[:author]}', '#{comment[:author_email]}', '#{comment[:content]}', '#{comment[:approved]}', '#{comment[:comment_date]}', '#{Time.now}')")
+            db.query("INSERT INTO #{table_prefix}blog_comments (blog_post_id, spam, name, email, body, state, created_at, updated_at) VALUES ('#{post_id}', '0', '#{comment[:author]}', '#{comment[:author_email]}', '#{comment[:content]}', '#{comment[:approved]}', '#{comment[:comment_date]}', '#{Time.now}')")
           end
         end
 
         # Associate categories
         post[:categories].each do |cat|
-          blog_category_id = db.query("SELECT id FROM blog_categories WHERE title = '#{cat}'")
-          blog_category_id = blog_category_id.first["id"] || nil
+          blog_category_id = db.query("SELECT id FROM #{table_prefix}blog_categories WHERE title = '#{cat}'")
+          if !blog_category_id.nil?
+            if !blog_category_id.first.nil?
+              blog_category_id = blog_category_id.first["id"] || nil
+            else
+              blog_category_id = nil
+            end
+          else
+            blog_category_id = nil
+          end
 
-          db.query("INSERT INTO blog_categories_blog_posts (blog_category_id, blog_post_id) VALUES ('#{blog_category_id}', '#{post_id}')")
+          db.query("INSERT INTO #{table_prefix}blog_categories_blog_posts (blog_category_id, blog_post_id) VALUES ('#{blog_category_id}', '#{post_id}')")
         end
       end
       p "#{post[:title]}"
